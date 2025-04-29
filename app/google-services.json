@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "620853237118",
+    "project_id": "acortadorurl-96b42",
+    "storage_bucket": "acortadorurl-96b42.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:620853237118:android:bdaa1e2416c117c8d44f2f",
+        "android_client_info": {
+          "package_name": "com.example.acortadorurl"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBiL3IVeuykQi1yPiXbPWh-7kDQlTV-w9s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

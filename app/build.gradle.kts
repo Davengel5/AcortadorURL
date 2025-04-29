@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -32,21 +33,19 @@ android {
 }
 
 dependencies {
+    //Librerías google
+    implementation(platform("com.google.firebase:firebase-bom:33.13.0"))
+    implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.firebase:firebase-auth")
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
 
+    //Librerias q ya taban
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("com.google.android.material:material:1.9.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
 
-    // Retrofit para APIs REST
-    implementation("com.squareup.retrofit2:retrofit:2.9.0")
-    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
-
-    // Firebase Auth (para login con Google)
-    implementation("com.google.firebase:firebase-auth:22.1.1")
-    implementation("com.google.android.gms:play-services-auth:20.7.0")
-
-    // Google Play Billing (para suscripciones)
-    implementation("com.android.billingclient:billing:6.0.1")
 
     implementation(libs.appcompat)
     implementation(libs.material)
