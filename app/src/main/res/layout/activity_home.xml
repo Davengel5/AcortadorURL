@@ -1,21 +1,81 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
     android:padding="16dp">
 
-    <TextView
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Pantalla Principal"
-        android:textSize="24sp"/>
+        android:orientation="vertical"
+        android:gravity="center">
 
-    <Button
-        android:id="@+id/btnLogout"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Cerrar Sesión"/>
+        <!-- Contador de URLs -->
+        <TextView
+            android:id="@+id/tvUrlCount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Usadas: 0/5"
+            android:textSize="16sp"
+            android:layout_marginBottom="16dp"/>
 
-</LinearLayout>
+        <!-- Input URL -->
+        <EditText
+            android:id="@+id/etUrl"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Ingresa tu URL"
+            android:inputType="textUri"
+            android:imeOptions="actionDone"/>
+
+        <!-- Botón Acortar -->
+        <Button
+            android:id="@+id/btnShorten"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Acortar URL"/>
+
+        <!-- URL Acortada -->
+        <TextView
+            android:id="@+id/tvShortUrl"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:textAlignment="center"
+            android:visibility="gone"/>
+
+        <!-- Botones de Acción -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginTop="8dp">
+
+            <Button
+                android:id="@+id/btnCopy"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Copiar"
+                android:visibility="gone"
+                android:layout_marginEnd="8dp"/>
+
+            <Button
+                android:id="@+id/btnOpen"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Abrir"
+                android:visibility="gone"/>
+        </LinearLayout>
+
+        <!-- Botón Cerrar Sesión -->
+        <Button
+            android:id="@+id/btnLogout"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:text="Cerrar sesión"/>
+
+    </LinearLayout>
+</ScrollView>
