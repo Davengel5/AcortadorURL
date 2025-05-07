@@ -18,32 +18,24 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 
 public class HomeActivity extends AppCompatActivity {
-
-    // Componentes UI
     private EditText etUrl;
     private Button btnShorten, btnCopy, btnOpen, btnLogout;
     private TextView tvShortUrl, tvUrlCount;
-
-    // Autenticación
     private FirebaseAuth mAuth;
     private GoogleSignInClient mGoogleSignInClient;
-
-    // Datos usuario
     private String userId;
-    private boolean isPremium = false; // Cambiar según suscripción
+    private boolean isPremium = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_home);
 
-        // Inicializar Firebase Auth
+        // Inicializar Firebase
         mAuth = FirebaseAuth.getInstance();
         FirebaseUser currentUser = mAuth.getCurrentUser();
         if (currentUser != null) {
             userId = currentUser.getUid();
-            // Aquí deberías verificar si el usuario es premium
-            // isPremium = checkPremiumStatus(userId);
         }
 
         // Configurar Google Sign-In
@@ -53,7 +45,7 @@ public class HomeActivity extends AppCompatActivity {
                 .build();
         mGoogleSignInClient = GoogleSignIn.getClient(this, gso);
 
-        // Vincular componentes UI
+        // Vincular vistas
         etUrl = findViewById(R.id.etUrl);
         btnShorten = findViewById(R.id.btnShorten);
         btnCopy = findViewById(R.id.btnCopy);
@@ -62,10 +54,10 @@ public class HomeActivity extends AppCompatActivity {
         tvShortUrl = findViewById(R.id.tvShortUrl);
         tvUrlCount = findViewById(R.id.tvUrlCount);
 
-        // Actualizar contador de URLs
+        // Actualizar contador
         updateUrlCount();
 
-        // Configurar listeners
+        // Listeners
         btnShorten.setOnClickListener(v -> shortenUrl());
         btnCopy.setOnClickListener(v -> copyToClipboard());
         btnOpen.setOnClickListener(v -> openInBrowser());
@@ -75,32 +67,46 @@ public class HomeActivity extends AppCompatActivity {
     private void shortenUrl() {
         String originalUrl = etUrl.getText().toString().trim();
 
-        // Validar URL
         if (originalUrl.isEmpty()) {
             etUrl.setError("Ingresa una URL");
             return;
         }
 
-        // Asegurar protocolo http
         if (!originalUrl.startsWith("http://") && !originalUrl.startsWith("https://")) {
             originalUrl = "http://" + originalUrl;
         }
 
-        // Acortar URL
-        UrlDatabase urlDatabase = UrlDatabase.getInstance(this);
-        String shortUrl = urlDatabase.shortenUrl(originalUrl, userId, isPremium);
+        btnShorten.setEnabled(false);
+        btnShorten.setText("Acortando...");
 
-        // Manejar resultado
-        if (shortUrl.equals("LIMIT_REACHED")) {
-            Toast.makeText(this, "Límite de 50 URLs alcanzado", Toast.LENGTH_LONG).show();
-        } else {
-            tvShortUrl.setText(shortUrl);
-            tvShortUrl.setVisibility(View.VISIBLE);
-            btnCopy.setVisibility(View.VISIBLE);
-            btnOpen.setVisibility(View.VISIBLE);
-            updateUrlCount();
-            Toast.makeText(this, "URL acortada creada", Toast.LENGTH_SHORT).show();
-        }
+        UrlDatabase.getInstance(this).shortenUrl(originalUrl, userId, isPremium, new UrlDatabase.UrlCallback() {
+            @Override
+            public void onSuccess(String shortUrl) {
+                runOnUiThread(() -> {
+                    btnShorten.setEnabled(true);
+                    btnShorten.setText("Acortar URL");
+                    tvShortUrl.setText(shortUrl);
+                    tvShortUrl.setVisibility(View.VISIBLE);
+                    btnCopy.setVisibility(View.VISIBLE);
+                    btnOpen.setVisibility(View.VISIBLE);
+                    updateUrlCount();
+                    Toast.makeText(HomeActivity.this, "URL acortada creada", Toast.LENGTH_SHORT).show();
+                });
+            }
+
+            @Override
+            public void onError(String message) {
+                runOnUiThread(() -> {
+                    btnShorten.setEnabled(true);
+                    btnShorten.setText("Acortar URL");
+                    if (message.equals("LIMIT_REACHED")) {
+                        Toast.makeText(HomeActivity.this, "Límite de 5 URLs alcanzado", Toast.LENGTH_LONG).show();
+                    } else {
+                        Toast.makeText(HomeActivity.this, "Error: " + message, Toast.LENGTH_LONG).show();
+                    }
+                });
+            }
+        });
     }
 
     private void copyToClipboard() {
@@ -112,62 +118,44 @@ public class HomeActivity extends AppCompatActivity {
 
     private void openInBrowser() {
         String shortUrl = tvShortUrl.getText().toString();
-        String originalUrl = UrlDatabase.getInstance(this).getOriginalUrl(
-                shortUrl.replace("misapp://", "")
-        );
 
-        if (originalUrl != null) {
-            try {
-                Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(originalUrl));
-                startActivity(browserIntent);
-            } catch (Exception e) {
-                Toast.makeText(this, "No se pudo abrir el enlace", Toast.LENGTH_SHORT).show();
-            }
+        if (shortUrl.isEmpty()) {
+            Toast.makeText(this, "No hay URL para abrir", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Extraer el código corto (ej: "http://192.168.1.239/AcortadorURL/abc123" -> "abc123")
+        String[] parts = shortUrl.split("/");
+        String shortCode = parts[parts.length - 1];
+
+        // Construir URL de redirección
+        String redirectUrl = "http://192.168.1.239/AcortadorURL/" + shortCode;
+
+        // Abrir en navegador
+        try {
+            Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(redirectUrl));
+            startActivity(browserIntent);
+        } catch (Exception e) {
+            Toast.makeText(this, "No se pudo abrir el enlace", Toast.LENGTH_SHORT).show();
         }
     }
 
     private void updateUrlCount() {
-        int count = UrlDatabase.getInstance(this).getUserUrlCount(userId);
-        String countText = "Usadas: " + count + "/" + (isPremium ? "∞" : "50");
-        tvUrlCount.setText(countText);
+        if (userId != null) {
+            UrlDatabase urlDatabase = UrlDatabase.getInstance(this);
+            int count = urlDatabase.getUrlCount(userId);
+            String countText = "Usadas: " + count + "/" + (isPremium ? "∞" : "5");
+            tvUrlCount.setText(countText);
+        }
     }
 
     private void signOut() {
-        // Cerrar sesión en Firebase
         mAuth.signOut();
-
-        // Cerrar sesión en Google
         mGoogleSignInClient.signOut().addOnCompleteListener(this, task -> {
-            // Redirigir a Login y limpiar historial
             Intent intent = new Intent(HomeActivity.this, MainActivity.class);
             intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(intent);
             finish();
         });
-    }
-
-    // Método para manejar deep links (opcional)
-    @Override
-    protected void onNewIntent(Intent intent) {
-        super.onNewIntent(intent);
-        handleDeepLink(intent);
-    }
-
-    private void handleDeepLink(Intent intent) {
-        if (intent != null && intent.getData() != null) {
-            String shortUrl = intent.getData().toString();
-            String originalUrl = UrlDatabase.getInstance(this).getOriginalUrl(
-                    shortUrl.replace("misapp://", "")
-            );
-
-            if (originalUrl != null) {
-                try {
-                    Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(originalUrl));
-                    startActivity(browserIntent);
-                } catch (Exception e) {
-                    Toast.makeText(this, "No se pudo abrir el enlace", Toast.LENGTH_SHORT).show();
-                }
-            }
-        }
     }
 }

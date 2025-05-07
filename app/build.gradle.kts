@@ -54,6 +54,10 @@ dependencies {
     implementation("com.google.android.material:material:1.9.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
 
+    //No se q pija son
+    implementation ("com.squareup.okhttp3:okhttp:4.9.1")
+    implementation ("com.google.code.gson:gson:2.8.8")
+
 
     implementation(libs.appcompat)
     implementation(libs.material)
