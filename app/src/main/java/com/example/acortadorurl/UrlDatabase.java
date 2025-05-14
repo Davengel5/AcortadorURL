@@ -8,7 +8,7 @@ import org.json.JSONObject;
 import java.io.IOException;
 
 public class UrlDatabase {
-    private static final String BASE_API_URL = "http://192.168.1.239/AcortadorURL/api/api.php";
+    private static final String BASE_API_URL = "https://apiurl.up.railway.app/api.php";
     private static UrlDatabase instance;
     private OkHttpClient client;
     private Context context;
@@ -32,13 +32,7 @@ public class UrlDatabase {
         void onError(String message);
     }
 
-    public void shortenUrl(String originalUrl, String userId, boolean isPremium, UrlCallback callback) {
-        // Verificar límite para usuarios free (5 URLs máx)
-        if (!isPremium && getUrlCount(userId) >= 5) {
-            callback.onError("LIMIT_REACHED");
-            return;
-        }
-
+    public void shortenUrl(String originalUrl, UrlCallback callback) {
         try {
             JSONObject json = new JSONObject();
             json.put("url", originalUrl);
@@ -66,7 +60,6 @@ public class UrlDatabase {
                         JSONObject jsonResponse = new JSONObject(responseData);
 
                         if (jsonResponse.has("short_url")) {
-                            incrementUrlCount(userId);
                             callback.onSuccess(jsonResponse.getString("short_url"));
                         } else {
                             callback.onError(jsonResponse.optString("error", "Error desconocido"));
@@ -121,14 +114,5 @@ public class UrlDatabase {
     private String extractShortCode(String shortUrl) {
         String[] parts = shortUrl.split("/");
         return parts[parts.length - 1];
-    }
-
-    public int getUrlCount(String userId) {
-        return prefs.getInt(userId + "_count", 0);
-    }
-
-    private void incrementUrlCount(String userId) {
-        int count = getUrlCount(userId);
-        prefs.edit().putInt(userId + "_count", count + 1).apply();
     }
 }
