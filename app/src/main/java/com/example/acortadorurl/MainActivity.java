@@ -82,7 +82,11 @@ public class MainActivity extends AppCompatActivity {
         mAuth.signInWithCredential(credential)
                 .addOnCompleteListener(this, task -> {
                     if (task.isSuccessful()) {
-                        // Redirigir a la pantalla principal
+                        FirebaseUser user = mAuth.getCurrentUser();
+                        if (user != null) {
+                            insertUserInApi(user); // ¡Aquí llamamos al método!
+                        }
+
                         Intent intent = new Intent(MainActivity.this, HomeActivity.class);
                         startActivity(intent);
                         finish();
