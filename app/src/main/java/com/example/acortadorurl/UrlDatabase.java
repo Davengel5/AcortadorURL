@@ -3,6 +3,8 @@ package com.example.acortadorurl;
 import android.content.Context;
 import android.content.SharedPreferences;
 import okhttp3.*;
+
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import java.io.IOException;
@@ -32,10 +34,11 @@ public class UrlDatabase {
         void onError(String message);
     }
 
-    public void shortenUrl(String originalUrl, UrlCallback callback) {
+    public void shortenUrl(String originalUrl, String userId, UrlCallback callback) {
         try {
             JSONObject json = new JSONObject();
             json.put("url", originalUrl);
+            json.put("user_id", userId);
 
             RequestBody body = RequestBody.create(
                     json.toString(),
@@ -114,5 +117,39 @@ public class UrlDatabase {
     private String extractShortCode(String shortUrl) {
         String[] parts = shortUrl.split("/");
         return parts[parts.length - 1];
+    }
+
+    public void getUserUrls(String userId, UrlListCallback callback) {
+        HttpUrl url = HttpUrl.parse(BASE_API_URL).newBuilder()
+                .addQueryParameter("user_id", userId)
+                .build();
+
+        Request request = new Request.Builder()
+                .url(url)
+                .get()
+                .build();
+
+        client.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                callback.onError(e.getMessage());
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                try {
+                    String responseData = response.body().string();
+                    JSONArray jsonArray = new JSONArray(responseData);
+                    callback.onSuccess(jsonArray);
+                } catch (Exception e) {
+                    callback.onError("Error procesando respuesta");
+                }
+            }
+        });
+    }
+
+    public interface UrlListCallback {
+        void onSuccess(JSONArray urls);
+        void onError(String message);
     }
 }

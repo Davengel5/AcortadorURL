@@ -15,6 +15,7 @@ import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 
 public class HomeActivity extends AppCompatActivity {
     private EditText etUrl;
@@ -55,6 +56,8 @@ public class HomeActivity extends AppCompatActivity {
 
     private void shortenUrl() {
         String originalUrl = etUrl.getText().toString().trim();
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        String userId = user != null ? user.getUid() : null;
 
         if (originalUrl.isEmpty()) {
             etUrl.setError("Ingresa una URL");
@@ -68,7 +71,7 @@ public class HomeActivity extends AppCompatActivity {
         btnShorten.setEnabled(false);
         btnShorten.setText("Acortando...");
 
-        UrlDatabase.getInstance(this).shortenUrl(originalUrl, new UrlDatabase.UrlCallback() {
+        UrlDatabase.getInstance(this).shortenUrl(originalUrl, userId, new UrlDatabase.UrlCallback() {
             @Override
             public void onSuccess(String shortUrl) {
                 runOnUiThread(() -> {
