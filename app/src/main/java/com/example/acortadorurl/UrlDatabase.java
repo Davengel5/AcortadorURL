@@ -2,6 +2,8 @@ package com.example.acortadorurl;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.util.Log;
+
 import okhttp3.*;
 
 import org.json.JSONArray;
@@ -30,66 +32,85 @@ public class UrlDatabase {
     }
 
     public interface UrlCallback {
-        void onSuccess(String result);
+        void onSuccess(String shortUrl, int remainingAttempts, boolean premiumStatus);
         void onError(String message);
     }
 
     public void shortenUrl(String originalUrl, String userEmail, UrlCallback callback) {
         try {
-            // Validación adicional en caso de que la URL llegue vacía
-            if (originalUrl == null || originalUrl.trim().isEmpty()) {
-                callback.onError("URL no puede estar vacía");
-                return;
-            }
-
             JSONObject json = new JSONObject();
             json.put("url", originalUrl);
             json.put("user_id", userEmail);
 
+            // Debug: Mostrar JSON que se enviará
+            Log.d("URL_DEBUG", "Enviando a API: " + json.toString());
+
             RequestBody body = RequestBody.create(
                     json.toString(),
-                    MediaType.parse("application/json; charset=utf-8") // Especifica charset
+                    MediaType.parse("application/json; charset=utf-8")
             );
 
             Request request = new Request.Builder()
                     .url(BASE_API_URL)
                     .post(body)
-                    .addHeader("Content-Type", "application/json") // Asegura el header
+                    .addHeader("Content-Type", "application/json")
                     .build();
 
             client.newCall(request).enqueue(new Callback() {
                 @Override
                 public void onFailure(Call call, IOException e) {
-                    callback.onError("Error de conexión: " + e.getMessage());
+                    Log.e("URL_ERROR", "Error de conexión: " + e.getMessage());
+                    callback.onError("Error de conexión");
                 }
 
                 @Override
                 public void onResponse(Call call, Response response) throws IOException {
                     try {
                         String responseData = response.body().string();
+                        Log.d("URL_DEBUG", "Respuesta del servidor: " + responseData);
+
                         JSONObject jsonResponse = new JSONObject(responseData);
 
-                        if (response.code() == 400 && jsonResponse.has("error")) {
-                            callback.onError(jsonResponse.getString("error"));
+                        // Manejar primero los errores
+                        if (!response.isSuccessful()) {
+                            String errorMsg = jsonResponse.optString("error", "Error del servidor");
+                            Log.e("URL_ERROR", "Código " + response.code() + ": " + errorMsg);
+                            callback.onError(errorMsg);
                             return;
                         }
 
+                        // Verificar campos esenciales
                         if (jsonResponse.has("short_url")) {
-                            callback.onSuccess(jsonResponse.getString("short_url"));
+                            int attempts = jsonResponse.optInt("remaining_attempts", -1);
+                            boolean premium = jsonResponse.optBoolean("is_premium", false);
+
+                            callback.onSuccess(
+                                    jsonResponse.getString("short_url"),
+                                    attempts,
+                                    premium
+                            );
                         } else {
-                            callback.onError("Respuesta inesperada del servidor");
+                            Log.e("URL_ERROR", "Respuesta incompleta: " + responseData);
+                            callback.onError("Respuesta incompleta del servidor");
                         }
                     } catch (Exception e) {
-                        callback.onError("Error procesando respuesta: " + e.getMessage());
+                        Log.e("URL_ERROR", "Error procesando respuesta: " + e.getMessage());
+                        callback.onError("Error procesando respuesta");
                     }
                 }
             });
         } catch (JSONException e) {
-            callback.onError("Error creando petición: " + e.getMessage());
+            Log.e("URL_ERROR", "Error creando JSON: " + e.getMessage());
+            callback.onError("Error creando petición");
         }
     }
 
-    public void getOriginalUrl(String shortUrl, UrlCallback callback) {
+    public interface OriginalUrlCallback {
+        void onSuccess(String originalUrl);
+        void onError(String message);
+    }
+
+    public void getOriginalUrl(String shortUrl, OriginalUrlCallback callback) {
         String shortCode = extractShortCode(shortUrl);
 
         HttpUrl url = HttpUrl.parse(BASE_API_URL).newBuilder()
@@ -114,7 +135,7 @@ public class UrlDatabase {
                     JSONObject jsonResponse = new JSONObject(responseData);
 
                     if (jsonResponse.has("url")) {
-                        callback.onSuccess(jsonResponse.getString("url"));
+                        callback.onSuccess(jsonResponse.getString("url")); // Solo un parámetro
                     } else {
                         callback.onError("URL no encontrada");
                     }
@@ -215,13 +236,13 @@ public class UrlDatabase {
         }
     }
     public interface AttemptsCallback {
-        void onSuccess(int remainingAttempts);
+        void onSuccess(int remainingAttempts, boolean premiumStatus);
         void onError(String message);
     }
-    public void getRemainingAttempts(int userId, AttemptsCallback callback) {
+    public void getRemainingAttempts(String userEmail, AttemptsCallback callback) {
         try {
             JSONObject json = new JSONObject();
-            json.put("user_id", userId);
+            json.put("email", userEmail);
 
             RequestBody body = RequestBody.create(
                     json.toString(),
@@ -231,6 +252,7 @@ public class UrlDatabase {
             Request request = new Request.Builder()
                     .url(BASE_API_URL + "/get_attempts.php")
                     .post(body)
+                    .addHeader("Content-Type", "application/json")
                     .build();
 
             client.newCall(request).enqueue(new Callback() {
@@ -242,11 +264,16 @@ public class UrlDatabase {
                 @Override
                 public void onResponse(Call call, Response response) throws IOException {
                     try {
-                        JSONObject jsonResponse = new JSONObject(response.body().string());
-                        if (jsonResponse.has("attempts")) {
-                            callback.onSuccess(jsonResponse.getInt("attempts"));
+                        String responseData = response.body().string();
+                        JSONObject jsonResponse = new JSONObject(responseData);
+
+                        if (jsonResponse.has("attempts") && jsonResponse.has("is_premium")) {
+                            callback.onSuccess(
+                                    jsonResponse.getInt("attempts"),
+                                    jsonResponse.getBoolean("is_premium")
+                            );
                         } else {
-                            callback.onError("Datos no recibidos");
+                            callback.onError("Formato de respuesta incorrecto");
                         }
                     } catch (Exception e) {
                         callback.onError("Error procesando respuesta");

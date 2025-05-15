@@ -69,6 +69,15 @@
                 android:visibility="gone"/>
         </LinearLayout>
 
+        <!-- Añade esto antes del botón de cerrar sesión -->
+        <Button
+            android:id="@+id/btnUpgrade"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Actualizar a Premium"
+            android:visibility="gone"/> <!-- Debe coincidir con el código Java -->
+
         <!-- Botón Cerrar Sesión -->
         <Button
             android:id="@+id/btnLogout"
