@@ -34,26 +34,33 @@ public class UrlDatabase {
         void onError(String message);
     }
 
-    public void shortenUrl(String originalUrl, String userId, UrlCallback callback) {
+    public void shortenUrl(String originalUrl, String userEmail, UrlCallback callback) {
         try {
+            // Validación adicional en caso de que la URL llegue vacía
+            if (originalUrl == null || originalUrl.trim().isEmpty()) {
+                callback.onError("URL no puede estar vacía");
+                return;
+            }
+
             JSONObject json = new JSONObject();
             json.put("url", originalUrl);
-            json.put("user_id", userId);
+            json.put("user_id", userEmail);
 
             RequestBody body = RequestBody.create(
                     json.toString(),
-                    MediaType.parse("application/json")
+                    MediaType.parse("application/json; charset=utf-8") // Especifica charset
             );
 
             Request request = new Request.Builder()
                     .url(BASE_API_URL)
                     .post(body)
+                    .addHeader("Content-Type", "application/json") // Asegura el header
                     .build();
 
             client.newCall(request).enqueue(new Callback() {
                 @Override
                 public void onFailure(Call call, IOException e) {
-                    callback.onError(e.getMessage());
+                    callback.onError("Error de conexión: " + e.getMessage());
                 }
 
                 @Override
@@ -62,19 +69,23 @@ public class UrlDatabase {
                         String responseData = response.body().string();
                         JSONObject jsonResponse = new JSONObject(responseData);
 
+                        if (response.code() == 400 && jsonResponse.has("error")) {
+                            callback.onError(jsonResponse.getString("error"));
+                            return;
+                        }
+
                         if (jsonResponse.has("short_url")) {
                             callback.onSuccess(jsonResponse.getString("short_url"));
                         } else {
-                            callback.onError(jsonResponse.optString("error", "Error desconocido"));
+                            callback.onError("Respuesta inesperada del servidor");
                         }
                     } catch (Exception e) {
-                        callback.onError("Error procesando respuesta");
+                        callback.onError("Error procesando respuesta: " + e.getMessage());
                     }
                 }
             });
-
         } catch (JSONException e) {
-            callback.onError("Error creando petición");
+            callback.onError("Error creando petición: " + e.getMessage());
         }
     }
 
@@ -151,5 +162,99 @@ public class UrlDatabase {
     public interface UrlListCallback {
         void onSuccess(JSONArray urls);
         void onError(String message);
+    }
+
+    // Añade esta interfaz
+    public interface UserIdCallback {
+        void onSuccess(int userId);
+        void onError(String message);
+    }
+
+    // Nuevo método para obtener el ID de usuario
+    public void getOrCreateUserId(String email, UserIdCallback callback) {
+        try {
+            JSONObject json = new JSONObject();
+            json.put("email", email);
+
+            RequestBody body = RequestBody.create(
+                    json.toString(),
+                    MediaType.parse("application/json")
+            );
+
+            Request request = new Request.Builder()
+                    .url(BASE_API_URL + "/get_user_id.php")
+                    .post(body)
+                    .build();
+
+            client.newCall(request).enqueue(new Callback() {
+                @Override
+                public void onFailure(Call call, IOException e) {
+                    callback.onError("Error de conexión: " + e.getMessage());
+                }
+
+                @Override
+                public void onResponse(Call call, Response response) throws IOException {
+                    try {
+                        String responseData = response.body().string();
+                        JSONObject jsonResponse = new JSONObject(responseData);
+
+                        if (jsonResponse.has("id")) {
+                            callback.onSuccess(jsonResponse.getInt("id"));
+                        } else if (jsonResponse.has("error")) {
+                            callback.onError(jsonResponse.getString("error"));
+                        } else {
+                            callback.onError("Formato de respuesta inesperado");
+                        }
+                    } catch (Exception e) {
+                        callback.onError("Error procesando respuesta: " + e.getMessage());
+                    }
+                }
+            });
+        } catch (JSONException e) {
+            callback.onError("Error creando petición: " + e.getMessage());
+        }
+    }
+    public interface AttemptsCallback {
+        void onSuccess(int remainingAttempts);
+        void onError(String message);
+    }
+    public void getRemainingAttempts(int userId, AttemptsCallback callback) {
+        try {
+            JSONObject json = new JSONObject();
+            json.put("user_id", userId);
+
+            RequestBody body = RequestBody.create(
+                    json.toString(),
+                    MediaType.parse("application/json")
+            );
+
+            Request request = new Request.Builder()
+                    .url(BASE_API_URL + "/get_attempts.php")
+                    .post(body)
+                    .build();
+
+            client.newCall(request).enqueue(new Callback() {
+                @Override
+                public void onFailure(Call call, IOException e) {
+                    callback.onError("Error de conexión");
+                }
+
+                @Override
+                public void onResponse(Call call, Response response) throws IOException {
+                    try {
+                        JSONObject jsonResponse = new JSONObject(response.body().string());
+                        if (jsonResponse.has("attempts")) {
+                            callback.onSuccess(jsonResponse.getInt("attempts"));
+                        } else {
+                            callback.onError("Datos no recibidos");
+                        }
+                    } catch (Exception e) {
+                        callback.onError("Error procesando respuesta");
+                    }
+                }
+            });
+        } catch (JSONException e) {
+            callback.onError("Error creando petición");
+        }
     }
 }
