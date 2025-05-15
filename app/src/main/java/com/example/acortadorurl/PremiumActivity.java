@@ -13,6 +13,9 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import org.json.JSONException;
 import org.json.JSONObject;
+
+import java.io.IOException;
+
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -151,57 +154,87 @@ public class PremiumActivity extends AppCompatActivity {
     }
 
     private void upgradeToPremium() {
+        Log.d("PremiumActivity", "Iniciando actualización a premium");
+
         FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
         if (user == null || user.getEmail() == null) {
-            Toast.makeText(this, "Error: No se pudo identificar tu cuenta", Toast.LENGTH_SHORT).show();
+            Log.e("PremiumActivity", "Usuario no autenticado");
+            showError("Debes iniciar sesión primero");
             return;
         }
 
+        Log.d("PremiumActivity", "Usuario: " + user.getEmail());
         btnPay.setEnabled(false);
         btnPay.setText("Procesando...");
 
         new Thread(() -> {
             try {
-                OkHttpClient client = new OkHttpClient();
-
                 JSONObject json = new JSONObject();
                 json.put("email", user.getEmail());
+                String jsonStr = json.toString();
+                Log.d("PremiumActivity", "JSON a enviar: " + jsonStr);
 
                 RequestBody body = RequestBody.create(
-                        json.toString(),
+                        jsonStr,
                         MediaType.parse("application/json")
                 );
 
+                String url = "https://apiurl.up.railway.app/update_user.php";
+                Log.d("PremiumActivity", "URL: " + url);
+
                 Request request = new Request.Builder()
-                        .url("https://apiurl.up.railway.app/update_user.php")
+                        .url(url)
                         .post(body)
+                        .addHeader("Content-Type", "application/json")
                         .build();
 
-                Response response = client.newCall(request).execute();
-                String responseData = response.body().string();
+                OkHttpClient client = new OkHttpClient();
+                Log.d("PremiumActivity", "Enviando petición...");
 
-                runOnUiThread(() -> {
-                    try {
-                        JSONObject jsonResponse = new JSONObject(responseData);
-                        if (jsonResponse.getBoolean("success")) {
+                try (Response response = client.newCall(request).execute()) {
+                    String responseData = response.body().string();
+                    Log.d("PremiumActivity", "Respuesta cruda: " + responseData);
+
+                    JSONObject jsonResponse = new JSONObject(responseData);
+                    Log.d("PremiumActivity", "Respuesta parseada: " + jsonResponse.toString());
+
+                    if (response.isSuccessful() && jsonResponse.getBoolean("success")) {
+                        Log.d("PremiumActivity", "Actualización exitosa");
+                        runOnUiThread(() -> {
+                            getSharedPreferences("user_prefs", MODE_PRIVATE)
+                                    .edit()
+                                    .putBoolean("is_premium", true)
+                                    .apply();
+                            Toast.makeText(this, "¡Ahora eres Premium!", Toast.LENGTH_SHORT).show();
                             setResult(RESULT_OK);
                             finish();
-                            Toast.makeText(PremiumActivity.this, "¡Ahora eres Premium!", Toast.LENGTH_SHORT).show();
-                        } else {
-                            btnPay.setEnabled(true);
-                            btnPay.setText("Actualizar a Premium");
-                            Toast.makeText(PremiumActivity.this,
-                                    "Error: " + jsonResponse.optString("message", "Error desconocido"),
-                                    Toast.LENGTH_LONG).show();
-                        }
-                    } catch (JSONException e) {
-                        handleUpgradeError("Error procesando la respuesta");
+                        });
+                    } else {
+                        String errorMsg = jsonResponse.optString("error",
+                                jsonResponse.optString("message", "Error desconocido del servidor"));
+                        Log.e("PremiumActivity", "Error del servidor: " + errorMsg);
+                        showError(errorMsg);
                     }
-                });
+                }
+            } catch (JSONException e) {
+                Log.e("PremiumActivity", "Error JSON", e);
+                showError("Error procesando respuesta");
+            } catch (IOException e) {
+                Log.e("PremiumActivity", "Error de red", e);
+                showError("Error de conexión: " + e.getMessage());
             } catch (Exception e) {
-                handleUpgradeError("Error de conexión: " + e.getMessage());
+                Log.e("PremiumActivity", "Error inesperado", e);
+                showError("Error inesperado");
             }
         }).start();
+    }
+
+    private void showError(String message) {
+        runOnUiThread(() -> {
+            btnPay.setEnabled(true);
+            btnPay.setText("Actualizar a Premium");
+            Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+        });
     }
 
     private void handleUpgradeError(String message) {

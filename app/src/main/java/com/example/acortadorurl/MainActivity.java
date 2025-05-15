@@ -97,26 +97,47 @@ public class MainActivity extends AppCompatActivity {
     }
     // Añade este método a tu clase MainActivity
     private void insertUserInApi(FirebaseUser user) {
-        if (user == null) return;
+        if (user == null || user.getEmail() == null) return;
 
         new Thread(() -> {
             try {
                 OkHttpClient client = new OkHttpClient();
 
+                // Primero verificar si el usuario ya existe
+                JSONObject checkUser = new JSONObject();
+                checkUser.put("email", user.getEmail());
+
+                Request checkRequest = new Request.Builder()
+                        .url("https://apiurl.up.railway.app/check_user.php")
+                        .post(RequestBody.create(
+                                checkUser.toString(),
+                                MediaType.parse("application/json")
+                        ))
+                        .build();
+
+                Response checkResponse = client.newCall(checkRequest).execute();
+                String checkData = checkResponse.body().string();
+                JSONObject checkJson = new JSONObject(checkData);
+
+                // Si el usuario ya existe, no hacer nada
+                if (checkJson.getBoolean("exists")) {
+                    Log.d("API_RESPONSE", "Usuario ya registrado");
+                    return;
+                }
+
+                // Si no existe, crear nuevo usuario
                 JSONObject json = new JSONObject();
                 json.put("nombre", user.getDisplayName() != null ? user.getDisplayName() : "Usuario");
                 json.put("email", user.getEmail());
                 json.put("tipo", "Free");
                 json.put("intentos", 5);
 
-                RequestBody body = RequestBody.create(
-                        json.toString(),
-                        MediaType.parse("application/json")
-                );
-
                 Request request = new Request.Builder()
                         .url("https://apiurl.up.railway.app/insert_user.php")
-                        .post(body)
+                        .post(RequestBody.create(
+                                json.toString(),
+                                MediaType.parse("application/json")
+                        ))
                         .build();
 
                 Response response = client.newCall(request).execute();
@@ -124,14 +145,10 @@ public class MainActivity extends AppCompatActivity {
 
                 runOnUiThread(() -> {
                     Log.d("API_RESPONSE", "Usuario registrado: " + responseData);
-                    Toast.makeText(MainActivity.this, "Registro completado", Toast.LENGTH_SHORT).show();
                 });
 
             } catch (Exception e) {
-                runOnUiThread(() -> {
-                    Log.e("API_ERROR", "Error insertando usuario", e);
-                    Toast.makeText(MainActivity.this, "Error en registro", Toast.LENGTH_SHORT).show();
-                });
+                Log.e("API_ERROR", "Error insertando usuario", e);
             }
         }).start();
     }

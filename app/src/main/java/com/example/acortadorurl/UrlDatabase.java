@@ -252,13 +252,12 @@ public class UrlDatabase {
             Request request = new Request.Builder()
                     .url(BASE_API_URL + "/get_attempts.php")
                     .post(body)
-                    .addHeader("Content-Type", "application/json")
                     .build();
 
             client.newCall(request).enqueue(new Callback() {
                 @Override
                 public void onFailure(Call call, IOException e) {
-                    callback.onError("Error de conexión");
+                    callback.onError(e.getMessage());
                 }
 
                 @Override
@@ -267,21 +266,17 @@ public class UrlDatabase {
                         String responseData = response.body().string();
                         JSONObject jsonResponse = new JSONObject(responseData);
 
-                        if (jsonResponse.has("attempts") && jsonResponse.has("is_premium")) {
-                            callback.onSuccess(
-                                    jsonResponse.getInt("attempts"),
-                                    jsonResponse.getBoolean("is_premium")
-                            );
-                        } else {
-                            callback.onError("Formato de respuesta incorrecto");
-                        }
+                        boolean premiumStatus = jsonResponse.optBoolean("is_premium", false);
+                        int attempts = premiumStatus ? Integer.MAX_VALUE : jsonResponse.optInt("attempts", 0);
+
+                        callback.onSuccess(attempts, premiumStatus);
                     } catch (Exception e) {
-                        callback.onError("Error procesando respuesta");
+                        callback.onError("Error parsing response");
                     }
                 }
             });
         } catch (JSONException e) {
-            callback.onError("Error creando petición");
+            callback.onError("Error creating request");
         }
     }
 }

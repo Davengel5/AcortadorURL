@@ -4,6 +4,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
@@ -63,12 +64,15 @@ public class HomeActivity extends AppCompatActivity {
         btnCopy.setVisibility(View.GONE);
         btnOpen.setVisibility(View.GONE);
         btnUpgrade.setVisibility(View.GONE);
+
+        checkPremiumStatus();
     }
 
     @Override
     protected void onStart() {
         super.onStart();
         checkUserStatus();
+        checkPremiumStatus(); // Verificar estado premium al iniciar
     }
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
@@ -212,5 +216,82 @@ public class HomeActivity extends AppCompatActivity {
     private void showPremiumUpgrade() {
         Intent intent = new Intent(this, PremiumActivity.class);
         startActivityForResult(intent, 1); // Usamos código 1 para identificar esta actividad
+    }
+    private void updatePremiumUI(boolean isPremium, int remainingAttempts) {
+        runOnUiThread(() -> {
+            // 1. Actualizar texto del contador
+            String countText;
+            if (isPremium) {
+                countText = "★ Cuenta Premium ★";
+            } else {
+                FirebaseUser user = mAuth.getCurrentUser();
+                if (user != null && !user.isAnonymous()) {
+                    // Mostrar intentos para usuarios registrados no premium
+                    countText = remainingAttempts == Integer.MAX_VALUE ?
+                            "★ Cuenta Premium ★" : // Caso de seguridad
+                            "Intentos: " + remainingAttempts;
+                } else {
+                    // Usuarios anónimos o no logueados
+                    countText = "Inicia sesión para ver intentos";
+                }
+            }
+            tvUrlCount.setText(countText);
+
+            // 2. Manejar visibilidad del botón de actualización
+            if (btnUpgrade != null) {
+                boolean shouldShowUpgradeButton = !isPremium &&
+                        mAuth.getCurrentUser() != null &&
+                        !mAuth.getCurrentUser().isAnonymous();
+
+                btnUpgrade.setVisibility(shouldShowUpgradeButton ? View.VISIBLE : View.GONE);
+            }
+
+            // 3. Actualizar estado interno
+            this.isPremium = isPremium;
+
+            // 4. Debug en logs
+            Log.d("PremiumUI", "Estado actualizado - Premium: " + isPremium +
+                    ", Intentos: " + remainingAttempts +
+                    ", Botón visible: " + (btnUpgrade != null && btnUpgrade.getVisibility() == View.VISIBLE));
+        });
+    }
+
+    // Modifica checkPremiumStatus para pasar los intentos
+    private void checkPremiumStatus() {
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        if (user == null) {
+            updatePremiumUI(false, 0);
+            return;
+        }
+
+        // Primero verificar caché local
+        SharedPreferences prefs = getSharedPreferences("user_prefs", MODE_PRIVATE);
+        boolean isPremium = prefs.getBoolean("is_premium", false);
+
+        if (isPremium) {
+            updatePremiumUI(true, Integer.MAX_VALUE);
+        }
+
+        // Luego verificar con el servidor
+        UrlDatabase.getInstance(this).getRemainingAttempts(user.getEmail(), new UrlDatabase.AttemptsCallback() {
+            @Override
+            public void onSuccess(int remainingAttempts, boolean premiumStatus) {
+                runOnUiThread(() -> {
+                    if (premiumStatus) {
+                        // Guardar estado premium localmente
+                        getSharedPreferences("user_prefs", MODE_PRIVATE)
+                                .edit()
+                                .putBoolean("is_premium", true)
+                                .apply();
+                    }
+                    updatePremiumUI(premiumStatus, premiumStatus ? Integer.MAX_VALUE : remainingAttempts);
+                });
+            }
+
+            @Override
+            public void onError(String message) {
+                runOnUiThread(() -> updatePremiumUI(false, 5)); // Valor por defecto
+            }
+        });
     }
 }
