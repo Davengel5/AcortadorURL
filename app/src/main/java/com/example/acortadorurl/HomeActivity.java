@@ -1,6 +1,10 @@
 package com.example.acortadorurl;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Intent;
@@ -19,6 +23,20 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+
 public class HomeActivity extends AppCompatActivity {
     private EditText etUrl;
     private Button btnShorten, btnCopy, btnOpen, btnLogout;
@@ -26,7 +44,7 @@ public class HomeActivity extends AppCompatActivity {
     private FirebaseAuth mAuth;
     private GoogleSignInClient mGoogleSignInClient;
     private boolean isPremium = false;
-    private Button btnUpgrade;
+    private Button btnUpgrade, btnHistory;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -52,6 +70,7 @@ public class HomeActivity extends AppCompatActivity {
         tvShortUrl = findViewById(R.id.tvShortUrl);
         tvUrlCount = findViewById(R.id.tvUrlCount);
         btnUpgrade = findViewById(R.id.btnUpgrade);
+        btnHistory = findViewById(R.id.btnHistory);
 
         // Configurar listeners
         btnShorten.setOnClickListener(v -> shortenUrl());
@@ -59,6 +78,17 @@ public class HomeActivity extends AppCompatActivity {
         btnOpen.setOnClickListener(v -> openInBrowser());
         btnLogout.setOnClickListener(v -> signOut());
         btnUpgrade.setOnClickListener(v -> showPremiumUpgrade());
+        //btnHistory.setOnClickListener(v -> loadUrlHistory());
+        btnHistory.setOnClickListener(v -> {
+            Log.d("HISTORY_DEBUG", "Botón presionado"); // Verifica si llega aquí
+            try {
+                loadUrlHistory();
+            } catch (Exception e) {
+                Log.e("HISTORY_ERROR", "Error al cargar historial", e);
+                Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            }
+        });
+
 
         // Ocultar botones inicialmente
         btnCopy.setVisibility(View.GONE);
@@ -293,5 +323,91 @@ public class HomeActivity extends AppCompatActivity {
                 runOnUiThread(() -> updatePremiumUI(false, 5)); // Valor por defecto
             }
         });
+    }
+    // Añade este método a tu HomeActivity
+    private void loadUrlHistory() {
+        FirebaseUser user = mAuth.getCurrentUser();
+        if (user == null || user.getEmail() == null) {
+            runOnUiThread(() -> Toast.makeText(this, "Usuario no autenticado", Toast.LENGTH_SHORT).show());
+            return;
+        }
+
+        new Thread(() -> {
+            try {
+                JSONObject json = new JSONObject();
+                json.put("email", user.getEmail());
+
+                OkHttpClient client = new OkHttpClient();
+                RequestBody body = RequestBody.create(
+                        json.toString(),
+                        MediaType.parse("application/json")
+                );
+
+                Request request = new Request.Builder()
+                        .url("https://apiurl.up.railway.app/historial.php")
+                        .post(body)
+                        .build();
+
+                Response response = client.newCall(request).execute();
+                String responseData = response.body().string();
+                JSONObject jsonResponse = new JSONObject(responseData);
+
+                // --- PUNTO 4: Manejo de errores --- //
+                if (jsonResponse.getBoolean("success")) {
+                    JSONArray urls = jsonResponse.getJSONArray("data");
+                    List<Map<String, String>> urlList = new ArrayList<>();
+
+                    for (int i = 0; i < urls.length(); i++) {
+                        JSONObject urlItem = urls.getJSONObject(i);
+                        Map<String, String> urlMap = new HashMap<>();
+                        urlMap.put("url", urlItem.getString("url"));
+                        urlMap.put("slug", urlItem.getString("slug"));
+                        urlMap.put("fecha", urlItem.getString("created_at"));
+                        urlList.add(urlMap);
+                    }
+
+                    runOnUiThread(() -> showHistoryDialog(urlList));
+                } else {
+                    // Mostrar error si la API falla
+                    String errorMsg = jsonResponse.optString("error", "Error desconocido");
+                    runOnUiThread(() -> {
+                        Toast.makeText(
+                                HomeActivity.this,
+                                "Error al cargar historial: " + errorMsg,
+                                Toast.LENGTH_LONG
+                        ).show();
+                        Log.e("API_ERROR", errorMsg);
+                    });
+                }
+
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    Toast.makeText(
+                            HomeActivity.this,
+                            "Excepción: " + e.getMessage(),
+                            Toast.LENGTH_LONG
+                    ).show();
+                    Log.e("HISTORY_ERROR", "Error completo:", e);
+                });
+            }
+        }).start();
+    }
+
+    private void showHistoryDialog(List<Map<String, String>> urls) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Tu historial de URLs");
+
+        // Inflar custom layout
+        View view = getLayoutInflater().inflate(R.layout.dialog_history, null);
+        RecyclerView recyclerView = view.findViewById(R.id.recyclerHistory);
+
+        // Configurar RecyclerView
+        recyclerView.setLayoutManager(new LinearLayoutManager(this));
+        HistorialAdapter adapter = new HistorialAdapter(urls);
+        recyclerView.setAdapter(adapter);
+
+        builder.setView(view);
+        builder.setPositiveButton("Cerrar", null);
+        builder.show();
     }
 }
