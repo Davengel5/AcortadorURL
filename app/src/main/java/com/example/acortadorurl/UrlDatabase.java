@@ -42,7 +42,6 @@ public class UrlDatabase {
             json.put("url", originalUrl);
             json.put("user_id", userEmail);
 
-            // Debug: Mostrar JSON que se enviará
             Log.d("URL_DEBUG", "Enviando a API: " + json.toString());
 
             RequestBody body = RequestBody.create(
@@ -71,7 +70,6 @@ public class UrlDatabase {
 
                         JSONObject jsonResponse = new JSONObject(responseData);
 
-                        // Manejar primero los errores
                         if (!response.isSuccessful()) {
                             String errorMsg = jsonResponse.optString("error", "Error del servidor");
                             Log.e("URL_ERROR", "Código " + response.code() + ": " + errorMsg);
@@ -79,7 +77,6 @@ public class UrlDatabase {
                             return;
                         }
 
-                        // Verificar campos esenciales
                         if (jsonResponse.has("short_url")) {
                             int attempts = jsonResponse.optInt("remaining_attempts", -1);
                             boolean premium = jsonResponse.optBoolean("is_premium", false);
@@ -135,7 +132,7 @@ public class UrlDatabase {
                     JSONObject jsonResponse = new JSONObject(responseData);
 
                     if (jsonResponse.has("url")) {
-                        callback.onSuccess(jsonResponse.getString("url")); // Solo un parámetro
+                        callback.onSuccess(jsonResponse.getString("url"));
                     } else {
                         callback.onError("URL no encontrada");
                     }
@@ -185,13 +182,11 @@ public class UrlDatabase {
         void onError(String message);
     }
 
-    // Añade esta interfaz
     public interface UserIdCallback {
         void onSuccess(int userId);
         void onError(String message);
     }
 
-    // Nuevo método para obtener el ID de usuario
     public void getOrCreateUserId(String email, UserIdCallback callback) {
         try {
             JSONObject json = new JSONObject();
