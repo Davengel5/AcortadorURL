@@ -95,7 +95,7 @@ public class MainActivity extends AppCompatActivity {
                     }
                 });
     }
-    // Añade este método a tu clase MainActivity
+    // Ya comiteate nmms
     private void insertUserInApi(FirebaseUser user) {
         if (user == null || user.getEmail() == null) return;
 
