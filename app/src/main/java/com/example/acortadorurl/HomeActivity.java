@@ -80,7 +80,7 @@ public class HomeActivity extends AppCompatActivity {
         btnUpgrade.setOnClickListener(v -> showPremiumUpgrade());
         //btnHistory.setOnClickListener(v -> loadUrlHistory());
         btnHistory.setOnClickListener(v -> {
-            Log.d("HISTORY_DEBUG", "Botón presionado"); // Verifica si llega aquí
+            Log.d("HISTORY_DEBUG", "Botón presionado");
             try {
                 loadUrlHistory();
             } catch (Exception e) {
@@ -89,8 +89,6 @@ public class HomeActivity extends AppCompatActivity {
             }
         });
 
-
-        // Ocultar botones inicialmente
         btnCopy.setVisibility(View.GONE);
         btnOpen.setVisibility(View.GONE);
         btnUpgrade.setVisibility(View.GONE);
@@ -102,13 +100,12 @@ public class HomeActivity extends AppCompatActivity {
     protected void onStart() {
         super.onStart();
         checkUserStatus();
-        checkPremiumStatus(); // Verificar estado premium al iniciar
+        checkPremiumStatus();
     }
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == 1 && resultCode == RESULT_OK) {
-            // Actualizar estado premium
             FirebaseUser user = mAuth.getCurrentUser();
             if (user != null) {
                 updateUrlCount(user.getEmail());
@@ -120,12 +117,10 @@ public class HomeActivity extends AppCompatActivity {
     private void checkUserStatus() {
         FirebaseUser user = mAuth.getCurrentUser();
         if (user != null) {
-            // Usuario autenticado - actualizar intentos
             updateUrlCount(user.getEmail());
         } else {
-            // Usuario no autenticado
             tvUrlCount.setText("Inicia sesión para ver intentos");
-            btnShorten.setEnabled(true); // Permitir acortar como anónimo
+            btnShorten.setEnabled(true);
         }
     }
 
@@ -165,7 +160,6 @@ public class HomeActivity extends AppCompatActivity {
             return;
         }
 
-        // Asegurar protocolo HTTP
         if (!originalUrl.startsWith("http://") && !originalUrl.startsWith("https://")) {
             originalUrl = "http://" + originalUrl;
         }
@@ -245,7 +239,7 @@ public class HomeActivity extends AppCompatActivity {
     }
     private void showPremiumUpgrade() {
         Intent intent = new Intent(this, PremiumActivity.class);
-        startActivityForResult(intent, 1); // Usamos código 1 para identificar esta actividad
+        startActivityForResult(intent, 1);
     }
     private void updatePremiumUI(boolean isPremium, int remainingAttempts) {
         runOnUiThread(() -> {
@@ -267,7 +261,6 @@ public class HomeActivity extends AppCompatActivity {
             }
             tvUrlCount.setText(countText);
 
-            // 2. Manejar visibilidad del botón de actualización
             if (btnUpgrade != null) {
                 boolean shouldShowUpgradeButton = !isPremium &&
                         mAuth.getCurrentUser() != null &&
@@ -276,7 +269,6 @@ public class HomeActivity extends AppCompatActivity {
                 btnUpgrade.setVisibility(shouldShowUpgradeButton ? View.VISIBLE : View.GONE);
             }
 
-            // 3. Actualizar estado interno
             this.isPremium = isPremium;
 
             // 4. Debug en logs
@@ -286,7 +278,6 @@ public class HomeActivity extends AppCompatActivity {
         });
     }
 
-    // Modifica checkPremiumStatus para pasar los intentos
     private void checkPremiumStatus() {
         FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
         if (user == null) {
@@ -294,7 +285,6 @@ public class HomeActivity extends AppCompatActivity {
             return;
         }
 
-        // Primero verificar caché local
         SharedPreferences prefs = getSharedPreferences("user_prefs", MODE_PRIVATE);
         boolean isPremium = prefs.getBoolean("is_premium", false);
 
@@ -302,13 +292,11 @@ public class HomeActivity extends AppCompatActivity {
             updatePremiumUI(true, Integer.MAX_VALUE);
         }
 
-        // Luego verificar con el servidor
         UrlDatabase.getInstance(this).getRemainingAttempts(user.getEmail(), new UrlDatabase.AttemptsCallback() {
             @Override
             public void onSuccess(int remainingAttempts, boolean premiumStatus) {
                 runOnUiThread(() -> {
                     if (premiumStatus) {
-                        // Guardar estado premium localmente
                         getSharedPreferences("user_prefs", MODE_PRIVATE)
                                 .edit()
                                 .putBoolean("is_premium", true)
@@ -324,7 +312,6 @@ public class HomeActivity extends AppCompatActivity {
             }
         });
     }
-    // Añade este método a tu HomeActivity
     private void loadUrlHistory() {
         FirebaseUser user = mAuth.getCurrentUser();
         if (user == null || user.getEmail() == null) {
@@ -352,7 +339,6 @@ public class HomeActivity extends AppCompatActivity {
                 String responseData = response.body().string();
                 JSONObject jsonResponse = new JSONObject(responseData);
 
-                // --- PUNTO 4: Manejo de errores --- //
                 if (jsonResponse.getBoolean("success")) {
                     JSONArray urls = jsonResponse.getJSONArray("data");
                     List<Map<String, String>> urlList = new ArrayList<>();
@@ -368,7 +354,6 @@ public class HomeActivity extends AppCompatActivity {
 
                     runOnUiThread(() -> showHistoryDialog(urlList));
                 } else {
-                    // Mostrar error si la API falla
                     String errorMsg = jsonResponse.optString("error", "Error desconocido");
                     runOnUiThread(() -> {
                         Toast.makeText(
@@ -397,11 +382,9 @@ public class HomeActivity extends AppCompatActivity {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Tu historial de URLs");
 
-        // Inflar custom layout
         View view = getLayoutInflater().inflate(R.layout.dialog_history, null);
         RecyclerView recyclerView = view.findViewById(R.id.recyclerHistory);
 
-        // Configurar RecyclerView
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         HistorialAdapter adapter = new HistorialAdapter(urls);
         recyclerView.setAdapter(adapter);
