@@ -42,7 +42,7 @@ public class PremiumActivity extends AppCompatActivity {
 
         String benefits = "★ Beneficios Premium ★\n\n" +
                 "• Intentos ilimitados para acortar URLs\n" +
-                "• Sin Botón de Premium\n" +
+                "• Sin Botón para hacerte premium\n" +
                 "• Y ya we\n" +
                 "• ¿Acaso querías más?";
         tvBenefits.setText(benefits);
