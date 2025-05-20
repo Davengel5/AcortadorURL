@@ -92,5 +92,14 @@
             android:layout_marginTop="32dp"
             android:text="Cerrar sesión"/>
 
+        <Button
+            android:id="@+id/btnDeleteAccount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Eliminar cuenta permanentemente"
+            android:textColor="@color/white"
+            android:backgroundTint="@color/black"/>
+
     </LinearLayout>
 </ScrollView>

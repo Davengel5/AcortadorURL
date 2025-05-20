@@ -24,8 +24,10 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -37,6 +39,8 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 
+import android.app.ProgressDialog;
+
 public class HomeActivity extends AppCompatActivity {
     private EditText etUrl;
     private Button btnShorten, btnCopy, btnOpen, btnLogout;
@@ -44,7 +48,7 @@ public class HomeActivity extends AppCompatActivity {
     private FirebaseAuth mAuth;
     private GoogleSignInClient mGoogleSignInClient;
     private boolean isPremium = false;
-    private Button btnUpgrade, btnHistory;
+    private Button btnUpgrade, btnHistory, btnDeleteAccount;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -71,6 +75,7 @@ public class HomeActivity extends AppCompatActivity {
         tvUrlCount = findViewById(R.id.tvUrlCount);
         btnUpgrade = findViewById(R.id.btnUpgrade);
         btnHistory = findViewById(R.id.btnHistory);
+        btnDeleteAccount = findViewById(R.id.btnDeleteAccount);
 
         // Configurar listeners
         btnShorten.setOnClickListener(v -> shortenUrl());
@@ -78,16 +83,8 @@ public class HomeActivity extends AppCompatActivity {
         btnOpen.setOnClickListener(v -> openInBrowser());
         btnLogout.setOnClickListener(v -> signOut());
         btnUpgrade.setOnClickListener(v -> showPremiumUpgrade());
-        //btnHistory.setOnClickListener(v -> loadUrlHistory());
-        btnHistory.setOnClickListener(v -> {
-            Log.d("HISTORY_DEBUG", "Botón presionado");
-            try {
-                loadUrlHistory();
-            } catch (Exception e) {
-                Log.e("HISTORY_ERROR", "Error al cargar historial", e);
-                Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
-            }
-        });
+        btnHistory.setOnClickListener(v -> loadUrlHistory());
+        btnDeleteAccount.setOnClickListener(v -> showDeleteAccountConfirmation());
 
         btnCopy.setVisibility(View.GONE);
         btnOpen.setVisibility(View.GONE);
@@ -401,5 +398,99 @@ public class HomeActivity extends AppCompatActivity {
         builder.setView(view);
         builder.setPositiveButton("Cerrar", null);
         builder.show();
+    }
+    private void showDeleteAccountConfirmation() {
+        new AlertDialog.Builder(this)
+                .setTitle("Eliminar cuenta permanentemente")
+                .setMessage("¿Estás seguro? Esta acción:\n\n• Eliminará TODAS tus URLs\n• Borrará tu cuenta irreversiblemente\n• No podrás recuperar los datos")
+                .setPositiveButton("Eliminar todo", (dialog, which) -> deleteUserAccount())
+                .setNegativeButton("Cancelar", null)
+                .setIcon(android.R.drawable.ic_dialog_alert)
+                .show();
+    }
+
+    private void deleteUserAccount() {
+        FirebaseUser user = mAuth.getCurrentUser();
+        if (user == null || user.getEmail() == null) return;
+
+        ProgressDialog progressDialog = ProgressDialog.show(
+                this,
+                "Eliminando cuenta",
+                "Por favor espere...",
+                true,
+                false
+        );
+
+        new Thread(() -> {
+            try {
+                JSONObject json = new JSONObject();
+                json.put("email", user.getEmail());
+
+                OkHttpClient client = new OkHttpClient();
+                Request request = new Request.Builder()
+                        .url("https://apiurl.up.railway.app/delete_user.php")
+                        .addHeader("Content-Type", "application/json") // Añade este header
+                        .delete(RequestBody.create(json.toString(), MediaType.parse("application/json")))
+                        .build();
+
+                Response response = client.newCall(request).execute();
+                String responseData = response.body().string();
+
+                // Debug: Ver la respuesta cruda
+                Log.d("API_RESPONSE", "Respuesta: " + responseData);
+
+                runOnUiThread(() -> {
+                    progressDialog.dismiss();
+                    try {
+                        // Verifica si es una respuesta HTML no esperada
+                        if (responseData.trim().startsWith("<!doctype")) {
+                            throw new JSONException("El servidor devolvió una página HTML");
+                        }
+
+                        JSONObject jsonResponse = new JSONObject(responseData);
+                        if (response.isSuccessful() && jsonResponse.getBoolean("success")) {
+                            deleteFirebaseUser(user);
+                        } else {
+                            String errorMsg = jsonResponse.optString("error",
+                                    "Código " + response.code() + ": " + response.message());
+                            showError(errorMsg);
+                        }
+                    } catch (JSONException e) {
+                        showError("Error en el servidor. Detalles técnicos: " +
+                                response.code() + " - " + responseData.substring(0, 50) + "...");
+                    }
+                });
+
+            } catch (IOException e) {
+                runOnUiThread(() -> {
+                    progressDialog.dismiss();
+                    showError("Error de conexión: " + e.getMessage());
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    progressDialog.dismiss();
+                    showError("Error: " + e.getMessage());
+                });
+            }
+        }).start();
+    }
+
+    private void deleteFirebaseUser(FirebaseUser user) {
+        user.delete()
+                .addOnSuccessListener(aVoid -> {
+                    signOut();
+                    Toast.makeText(this, "Cuenta eliminada permanentemente", Toast.LENGTH_SHORT).show();
+                })
+                .addOnFailureListener(e -> {
+                    showError("Error al eliminar cuenta de autenticación: " + e.getMessage());
+                });
+    }
+
+    private void showError(String message) {
+        new AlertDialog.Builder(this)
+                .setTitle("Error")
+                .setMessage(message)
+                .setPositiveButton("Aceptar", null)
+                .show();
     }
 }
