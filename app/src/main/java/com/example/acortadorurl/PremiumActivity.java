@@ -34,27 +34,23 @@ public class PremiumActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_premium);
 
-        // Inicializar vistas
         TextView tvBenefits = findViewById(R.id.tvBenefits);
         etCardNumber = findViewById(R.id.etCardNumber);
         etExpiry = findViewById(R.id.etExpiry);
         etCvv = findViewById(R.id.etCvv);
         btnPay = findViewById(R.id.btnPay);
 
-        // Configurar beneficios
         String benefits = "★ Beneficios Premium ★\n\n" +
                 "• Intentos ilimitados para acortar URLs\n" +
-                "• Sin Anuncios\n" +
+                "• Sin Botón de Premium\n" +
                 "• Y ya we\n" +
                 "• ¿Acaso querías más?";
         tvBenefits.setText(benefits);
 
-        // Configurar listeners
         setupCardNumberFormatting();
         setupExpiryFormatting();
         setupValidationListener();
 
-        // Botón de pago
         btnPay.setOnClickListener(v -> upgradeToPremium());
     }
 
