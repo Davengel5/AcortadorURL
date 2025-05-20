@@ -5,6 +5,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Intent;
@@ -49,16 +50,20 @@ public class HomeActivity extends AppCompatActivity {
     private GoogleSignInClient mGoogleSignInClient;
     private boolean isPremium = false;
     private Button btnUpgrade, btnHistory, btnDeleteAccount;
+    private SharedPreferences sharedPreferences;
+    private static final String PREFS_NAME = "UserPrefs";
+    private static final String PREMIUM_STATUS_KEY = "isPremium";
+    private static final String PREMIUM_DATE_KEY = "premiumDate";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_home);
 
-        // Inicializar Firebase
+        sharedPreferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+
         mAuth = FirebaseAuth.getInstance();
 
-        // Configurar Google Sign-In
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                 .requestIdToken(getString(R.string.default_web_client_id))
                 .requestEmail()
@@ -90,14 +95,13 @@ public class HomeActivity extends AppCompatActivity {
         btnOpen.setVisibility(View.GONE);
         btnUpgrade.setVisibility(View.GONE);
 
-        checkPremiumStatus();
+        checkUserStatus();
     }
 
     @Override
     protected void onStart() {
         super.onStart();
         checkUserStatus();
-        checkPremiumStatus();
     }
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
@@ -114,11 +118,74 @@ public class HomeActivity extends AppCompatActivity {
     private void checkUserStatus() {
         FirebaseUser user = mAuth.getCurrentUser();
         if (user != null) {
+            verifyPremiumStatus(user.getEmail());
             updateUrlCount(user.getEmail());
-        } else {
-            tvUrlCount.setText("Inicia sesión para ver intentos");
-            btnShorten.setEnabled(true);
         }
+    }
+
+    private void verifyPremiumStatus(String email) {
+        // Primero verificar caché local
+        boolean cachedPremium = sharedPreferences.getBoolean(PREMIUM_STATUS_KEY, false);
+        if (cachedPremium) {
+            updatePremiumUI(true, Integer.MAX_VALUE);
+        }
+
+        new Thread(() -> {
+            try {
+                JSONObject json = new JSONObject();
+                json.put("email", email);
+
+                Request request = new Request.Builder()
+                        .url("https://apiurl.up.railway.app/get_premium_status.php")
+                        .post(RequestBody.create(json.toString(), MediaType.parse("application/json")))
+                        .build();
+
+                Response response = new OkHttpClient().newCall(request).execute();
+                String responseData = response.body().string();
+                JSONObject jsonResponse = new JSONObject(responseData);
+
+                boolean isPremium = jsonResponse.getBoolean("is_premium");
+                String premiumDate = jsonResponse.optString("fecha_upgrade", "");
+
+                // Guardar en preferencias
+                sharedPreferences.edit()
+                        .putBoolean(PREMIUM_STATUS_KEY, isPremium)
+                        .putString(PREMIUM_DATE_KEY, premiumDate)
+                        .apply();
+
+                runOnUiThread(() -> {
+                    updatePremiumUI(isPremium, isPremium ? Integer.MAX_VALUE : getRemainingAttempts());
+                });
+
+            } catch (Exception e) {
+                Log.e("PremiumCheck", "Error", e);
+                // Mantener estado caché si hay error
+                boolean fallbackPremium = sharedPreferences.getBoolean(PREMIUM_STATUS_KEY, false);
+                runOnUiThread(() -> {
+                    updatePremiumUI(fallbackPremium, fallbackPremium ? Integer.MAX_VALUE : getRemainingAttempts());
+                });
+            }
+        }).start();
+    }
+    private int getRemainingAttempts() {
+        // 1. Usar valor de caché si existe
+        SharedPreferences prefs = getSharedPreferences("UrlPrefs", MODE_PRIVATE);
+        int attempts = prefs.getInt("remaining_attempts", -1);
+
+        // 2. Si no hay caché o es premium, usar lógica existente
+        if (attempts == -1 || isPremium) {
+            return isPremium ? Integer.MAX_VALUE : 5; // 5 es tu valor por defecto
+        }
+
+        return attempts;
+    }
+
+    // Actualiza este método cuando recibas los intentos del servidor
+    private void updateAttemptsCache(int attempts) {
+        getSharedPreferences("UrlPrefs", MODE_PRIVATE)
+                .edit()
+                .putInt("remaining_attempts", attempts)
+                .apply();
     }
 
     private void updateUrlCount(String userEmail) {
@@ -240,6 +307,7 @@ public class HomeActivity extends AppCompatActivity {
     }
     private void updatePremiumUI(boolean isPremium, int remainingAttempts) {
         runOnUiThread(() -> {
+            btnShorten.setEnabled(true);
             // 1. Actualizar texto del contador
             String countText;
             if (isPremium) {
@@ -258,55 +326,20 @@ public class HomeActivity extends AppCompatActivity {
             }
             tvUrlCount.setText(countText);
 
-            if (btnUpgrade != null) {
-                boolean shouldShowUpgradeButton = !isPremium &&
-                        mAuth.getCurrentUser() != null &&
-                        !mAuth.getCurrentUser().isAnonymous();
+            // 2. Actualizar visibilidad del botón de upgrade
+            boolean shouldShowUpgradeButton = !isPremium &&
+                    mAuth.getCurrentUser() != null &&
+                    !mAuth.getCurrentUser().isAnonymous();
 
-                btnUpgrade.setVisibility(shouldShowUpgradeButton ? View.VISIBLE : View.GONE);
-            }
+            btnUpgrade.setVisibility(shouldShowUpgradeButton ? View.VISIBLE : View.GONE);
 
+            // 3. Actualizar estado premium
             this.isPremium = isPremium;
 
             // 4. Debug en logs
             Log.d("PremiumUI", "Estado actualizado - Premium: " + isPremium +
                     ", Intentos: " + remainingAttempts +
-                    ", Botón visible: " + (btnUpgrade != null && btnUpgrade.getVisibility() == View.VISIBLE));
-        });
-    }
-
-    private void checkPremiumStatus() {
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user == null) {
-            updatePremiumUI(false, 0);
-            return;
-        }
-
-        SharedPreferences prefs = getSharedPreferences("user_prefs", MODE_PRIVATE);
-        boolean isPremium = prefs.getBoolean("is_premium", false);
-
-        if (isPremium) {
-            updatePremiumUI(true, Integer.MAX_VALUE);
-        }
-
-        UrlDatabase.getInstance(this).getRemainingAttempts(user.getEmail(), new UrlDatabase.AttemptsCallback() {
-            @Override
-            public void onSuccess(int remainingAttempts, boolean premiumStatus) {
-                runOnUiThread(() -> {
-                    if (premiumStatus) {
-                        getSharedPreferences("user_prefs", MODE_PRIVATE)
-                                .edit()
-                                .putBoolean("is_premium", true)
-                                .apply();
-                    }
-                    updatePremiumUI(premiumStatus, premiumStatus ? Integer.MAX_VALUE : remainingAttempts);
-                });
-            }
-
-            @Override
-            public void onError(String message) {
-                runOnUiThread(() -> updatePremiumUI(false, 5)); // Valor por defecto
-            }
+                    ", Botón visible: " + (btnUpgrade.getVisibility() == View.VISIBLE));
         });
     }
     private void loadUrlHistory() {

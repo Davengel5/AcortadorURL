@@ -84,16 +84,114 @@ public class MainActivity extends AppCompatActivity {
                     if (task.isSuccessful()) {
                         FirebaseUser user = mAuth.getCurrentUser();
                         if (user != null) {
-                            insertUserInApi(user); // ¡Aquí llamamos al método!
+                            // Primero verificar si existe en BD, luego registrar si es necesario
+                            checkUserExistsAndRegister(user);
                         }
-
-                        Intent intent = new Intent(MainActivity.this, HomeActivity.class);
-                        startActivity(intent);
-                        finish();
                     } else {
                         Toast.makeText(this, "Error en autenticación", Toast.LENGTH_SHORT).show();
                     }
                 });
+    }
+
+    private void checkUserExistsAndRegister(FirebaseUser user) {
+        new Thread(() -> {
+            try {
+                // 1. Verificar si el usuario ya existe
+                JSONObject checkJson = new JSONObject();
+                checkJson.put("email", user.getEmail());
+
+                Request checkRequest = new Request.Builder()
+                        .url("https://apiurl.up.railway.app/check_user.php")
+                        .post(RequestBody.create(checkJson.toString(), MediaType.parse("application/json")))
+                        .build();
+
+                Response checkResponse = new OkHttpClient().newCall(checkRequest).execute();
+                String checkData = checkResponse.body().string();
+                JSONObject checkResult = new JSONObject(checkData);
+
+                // 2. Registrar sólo si no existe
+                if (!checkResult.getBoolean("exists")) {
+                    JSONObject registerJson = new JSONObject();
+                    registerJson.put("email", user.getEmail());
+                    registerJson.put("nombre", user.getDisplayName() != null ? user.getDisplayName() : "Usuario");
+                    registerJson.put("tipo", "Free");
+                    registerJson.put("intentos", 5);
+
+                    Request registerRequest = new Request.Builder()
+                            .url("https://apiurl.up.railway.app/insert_user.php")
+                            .post(RequestBody.create(registerJson.toString(), MediaType.parse("application/json")))
+                            .build();
+
+                    new OkHttpClient().newCall(registerRequest).execute();
+                }
+
+                // 3. Verificar estado premium y redirigir
+                checkPremiumStatus(user.getEmail());
+
+            } catch (Exception e) {
+                Log.e("Registration", "Error: ", e);
+                runOnUiThread(() -> {
+                    startActivity(new Intent(MainActivity.this, HomeActivity.class));
+                    finish();
+                });
+            }
+        }).start();
+    }
+
+    private void checkPremiumStatus(String email) {
+        new Thread(() -> {
+            try {
+                JSONObject json = new JSONObject();
+                json.put("email", email);
+
+                Request request = new Request.Builder()
+                        .url("https://apiurl.up.railway.app/get_premium_status.php")
+                        .post(RequestBody.create(json.toString(), MediaType.parse("application/json")))
+                        .build();
+
+                Response response = new OkHttpClient().newCall(request).execute();
+                String responseData = response.body().string();
+                JSONObject jsonResponse = new JSONObject(responseData);
+
+                boolean isPremium = jsonResponse.getBoolean("is_premium");
+
+                runOnUiThread(() -> {
+                    Intent intent = new Intent(MainActivity.this, HomeActivity.class);
+                    intent.putExtra("is_premium", isPremium);
+                    startActivity(intent);
+                    finish();
+                });
+
+            } catch (Exception e) {
+                Log.e("PremiumCheck", "Error: ", e);
+                runOnUiThread(() -> {
+                    startActivity(new Intent(MainActivity.this, HomeActivity.class));
+                    finish();
+                });
+            }
+        }).start();
+    }
+
+    private void registerUserInDatabase(FirebaseUser user) {
+        new Thread(() -> {
+            try {
+                JSONObject json = new JSONObject();
+                json.put("email", user.getEmail());
+                json.put("nombre", user.getDisplayName() != null ? user.getDisplayName() : "Usuario");
+                json.put("tipo", "Free"); // Por defecto Free
+                json.put("intentos", 5);  // Intentos iniciales
+
+                OkHttpClient client = new OkHttpClient();
+                Request request = new Request.Builder()
+                        .url("https://apiurl.up.railway.app/insert_user.php")
+                        .post(RequestBody.create(json.toString(), MediaType.parse("application/json")))
+                        .build();
+
+                client.newCall(request).execute();
+            } catch (Exception e) {
+                Log.e("REGISTER_ERROR", "Error registrando usuario", e);
+            }
+        }).start();
     }
     // Ya comiteate nmms
     private void insertUserInApi(FirebaseUser user) {

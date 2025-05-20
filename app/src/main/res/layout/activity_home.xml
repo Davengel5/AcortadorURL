@@ -76,7 +76,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:text="Actualizar a Premium"
-            android:visibility="gone"/> <!-- Debe coincidir con el código Java -->
+            android:visibility="gone"/>
 
         <Button
             android:id="@+id/btnHistory"
