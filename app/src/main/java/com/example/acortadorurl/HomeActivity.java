@@ -387,6 +387,15 @@ public class HomeActivity extends AppCompatActivity {
 
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         HistorialAdapter adapter = new HistorialAdapter(urls);
+
+        // Configurar el listener
+        adapter.setOnItemDeletedListener(new HistorialAdapter.OnItemDeletedListener() {
+            @Override
+            public void onItemDeleted() {
+                loadUrlHistory(); // Recargar el historial cuando se elimina un item
+            }
+        });
+
         recyclerView.setAdapter(adapter);
 
         builder.setView(view);
