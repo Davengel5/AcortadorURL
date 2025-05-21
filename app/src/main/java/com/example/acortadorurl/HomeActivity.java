@@ -6,7 +6,6 @@ import android.content.ClipboardManager;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -31,17 +30,14 @@ public class HomeActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_home);
 
-        // Inicializar Firebase
         mAuth = FirebaseAuth.getInstance();
 
-        // Configurar Google Sign-In
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                 .requestIdToken(getString(R.string.default_web_client_id))
                 .requestEmail()
                 .build();
         mGoogleSignInClient = GoogleSignIn.getClient(this, gso);
 
-        // Vincular vistas
         etUrl = findViewById(R.id.etUrl);
         btnShorten = findViewById(R.id.btnShorten);
         btnCopy = findViewById(R.id.btnCopy);
@@ -50,7 +46,6 @@ public class HomeActivity extends AppCompatActivity {
         tvShortUrl = findViewById(R.id.tvShortUrl);
         tvUrlCount = findViewById(R.id.tvUrlCount);
 
-        // Listeners
         btnShorten.setOnClickListener(v -> shortenUrl());
         btnCopy.setOnClickListener(v -> copyToClipboard());
         btnOpen.setOnClickListener(v -> openInBrowser());
@@ -70,7 +65,6 @@ public class HomeActivity extends AppCompatActivity {
             return;
         }
 
-        // Asegurar protocolo HTTP
         if (!originalUrl.startsWith("http://") && !originalUrl.startsWith("https://")) {
             originalUrl = "http://" + originalUrl;
         }
@@ -86,11 +80,8 @@ public class HomeActivity extends AppCompatActivity {
                     btnShorten.setText("Acortar URL");
                     tvShortUrl.setText(shortUrl);
                     tvShortUrl.setVisibility(View.VISIBLE);
-
-                    // Mostrar botones adicionales
                     btnCopy.setVisibility(View.VISIBLE);
                     btnOpen.setVisibility(View.VISIBLE);
-
                     Toast.makeText(HomeActivity.this, "URL acortada creada", Toast.LENGTH_SHORT).show();
                 });
             }
@@ -129,19 +120,16 @@ public class HomeActivity extends AppCompatActivity {
     }
 
     private void signOut() {
-        // Cerrar sesión en Firebase
         mAuth.signOut();
-
-        // Cerrar sesión en Google
         mGoogleSignInClient.signOut().addOnCompleteListener(this,
                 task -> {
-                    // Redirigir al login
                     Intent intent = new Intent(HomeActivity.this, MainActivity.class);
                     intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
                     startActivity(intent);
                     finish();
                 });
     }
+
     private void updateUrlCount() {
         FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
         if (user != null && user.getEmail() != null) {

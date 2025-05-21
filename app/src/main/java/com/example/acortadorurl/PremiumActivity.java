@@ -23,7 +23,6 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 
 public class PremiumActivity extends AppCompatActivity {
-
     private EditText etCardNumber, etExpiry, etCvv;
     private Button btnPay;
     private boolean isFormatting = false;
