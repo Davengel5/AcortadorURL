@@ -46,10 +46,6 @@ public class HistorialAdapter extends RecyclerView.Adapter<HistorialAdapter.View
     public void setOnItemDeletedListener(OnItemDeletedListener listener) {
         this.onItemDeletedListener = listener;
     }
-    public void actualizarDatos(List<Map<String, String>> nuevosDatos) {
-        this.urls = nuevosDatos;
-        notifyDataSetChanged();
-    }
 
     @NonNull
     @Override
@@ -134,7 +130,6 @@ public class HistorialAdapter extends RecyclerView.Adapter<HistorialAdapter.View
                     try {
                         JSONObject jsonResponse = new JSONObject(responseData);
                         if (jsonResponse.getBoolean("success")) {
-                            // Usamos la posición pasada como parámetro
                             urls.remove(position);
                             notifyItemRemoved(position);
                             Toast.makeText(context, "URL eliminada", Toast.LENGTH_SHORT).show();

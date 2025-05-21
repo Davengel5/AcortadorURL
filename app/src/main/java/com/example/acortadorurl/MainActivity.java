@@ -1,11 +1,9 @@
 package com.example.acortadorurl;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
@@ -19,13 +17,8 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.GoogleAuthProvider;
 
-import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.IOException;
-
-import okhttp3.Call;
-import okhttp3.Callback;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -47,9 +40,8 @@ public class MainActivity extends AppCompatActivity {
         mAuth = FirebaseAuth.getInstance();
         btnGoogleLogin = findViewById(R.id.btnGoogleLogin);
 
-        // Configurar Google Sign-In
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                .requestIdToken(getString(R.string.default_web_client_id)) // Usa el ID de Firebase
+                .requestIdToken(getString(R.string.default_web_client_id))
                 .requestEmail()
                 .build();
         mGoogleSignInClient = GoogleSignIn.getClient(this, gso);
@@ -84,7 +76,6 @@ public class MainActivity extends AppCompatActivity {
                     if (task.isSuccessful()) {
                         FirebaseUser user = mAuth.getCurrentUser();
                         if (user != null) {
-                            // Primero verificar si existe en BD, luego registrar si es necesario
                             checkUserExistsAndRegister(user);
                         }
                     } else {
@@ -96,7 +87,6 @@ public class MainActivity extends AppCompatActivity {
     private void checkUserExistsAndRegister(FirebaseUser user) {
         new Thread(() -> {
             try {
-                // 1. Verificar si el usuario ya existe
                 JSONObject checkJson = new JSONObject();
                 checkJson.put("email", user.getEmail());
 
@@ -109,7 +99,6 @@ public class MainActivity extends AppCompatActivity {
                 String checkData = checkResponse.body().string();
                 JSONObject checkResult = new JSONObject(checkData);
 
-                // 2. Registrar sólo si no existe
                 if (!checkResult.getBoolean("exists")) {
                     JSONObject registerJson = new JSONObject();
                     registerJson.put("email", user.getEmail());
@@ -125,7 +114,6 @@ public class MainActivity extends AppCompatActivity {
                     new OkHttpClient().newCall(registerRequest).execute();
                 }
 
-                // 3. Verificar estado premium y redirigir
                 checkPremiumStatus(user.getEmail());
 
             } catch (Exception e) {
@@ -193,7 +181,6 @@ public class MainActivity extends AppCompatActivity {
             }
         }).start();
     }
-    // Ya comiteate nmms
     private void insertUserInApi(FirebaseUser user) {
         if (user == null || user.getEmail() == null) return;
 
@@ -201,7 +188,6 @@ public class MainActivity extends AppCompatActivity {
             try {
                 OkHttpClient client = new OkHttpClient();
 
-                // Primero verificar si el usuario ya existe
                 JSONObject checkUser = new JSONObject();
                 checkUser.put("email", user.getEmail());
 
@@ -217,13 +203,11 @@ public class MainActivity extends AppCompatActivity {
                 String checkData = checkResponse.body().string();
                 JSONObject checkJson = new JSONObject(checkData);
 
-                // Si el usuario ya existe, no hacer nada
                 if (checkJson.getBoolean("exists")) {
                     Log.d("API_RESPONSE", "Usuario ya registrado");
                     return;
                 }
 
-                // Si no existe, crear nuevo usuario
                 JSONObject json = new JSONObject();
                 json.put("nombre", user.getDisplayName() != null ? user.getDisplayName() : "Usuario");
                 json.put("email", user.getEmail());

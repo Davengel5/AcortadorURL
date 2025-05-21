@@ -11,7 +11,6 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- Encabezado -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -22,7 +21,6 @@
             android:gravity="center"
             android:layout_marginBottom="24dp"/>
 
-        <!-- Beneficios -->
         <TextView
             android:id="@+id/tvBenefits"
             android:layout_width="match_parent"
@@ -31,7 +29,6 @@
             android:lineSpacingMultiplier="1.2"
             android:layout_marginBottom="32dp"/>
 
-        <!-- Tarjeta -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -46,7 +43,6 @@
             android:inputType="number"
             android:maxLength="19"/>
 
-        <!-- Fecha y CVV -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -97,7 +93,6 @@
             </LinearLayout>
         </LinearLayout>
 
-        <!-- Botón -->
         <Button
             android:id="@+id/btnPay"
             android:layout_width="match_parent"
@@ -109,7 +104,6 @@
             android:textAllCaps="false"
             android:textSize="16sp"/>
 
-        <!-- Nota segura -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

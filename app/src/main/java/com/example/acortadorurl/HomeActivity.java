@@ -70,7 +70,6 @@ public class HomeActivity extends AppCompatActivity {
                 .build();
         mGoogleSignInClient = GoogleSignIn.getClient(this, gso);
 
-        // Vincular vistas
         etUrl = findViewById(R.id.etUrl);
         btnShorten = findViewById(R.id.btnShorten);
         btnCopy = findViewById(R.id.btnCopy);
@@ -82,7 +81,6 @@ public class HomeActivity extends AppCompatActivity {
         btnHistory = findViewById(R.id.btnHistory);
         btnDeleteAccount = findViewById(R.id.btnDeleteAccount);
 
-        // Configurar listeners
         btnShorten.setOnClickListener(v -> shortenUrl());
         btnCopy.setOnClickListener(v -> copyToClipboard());
         btnOpen.setOnClickListener(v -> openInBrowser());
@@ -124,7 +122,6 @@ public class HomeActivity extends AppCompatActivity {
     }
 
     private void verifyPremiumStatus(String email) {
-        // Primero verificar caché local
         boolean cachedPremium = sharedPreferences.getBoolean(PREMIUM_STATUS_KEY, false);
         if (cachedPremium) {
             updatePremiumUI(true, Integer.MAX_VALUE);
@@ -147,7 +144,6 @@ public class HomeActivity extends AppCompatActivity {
                 boolean isPremium = jsonResponse.getBoolean("is_premium");
                 String premiumDate = jsonResponse.optString("fecha_upgrade", "");
 
-                // Guardar en preferencias
                 sharedPreferences.edit()
                         .putBoolean(PREMIUM_STATUS_KEY, isPremium)
                         .putString(PREMIUM_DATE_KEY, premiumDate)
@@ -159,7 +155,6 @@ public class HomeActivity extends AppCompatActivity {
 
             } catch (Exception e) {
                 Log.e("PremiumCheck", "Error", e);
-                // Mantener estado caché si hay error
                 boolean fallbackPremium = sharedPreferences.getBoolean(PREMIUM_STATUS_KEY, false);
                 runOnUiThread(() -> {
                     updatePremiumUI(fallbackPremium, fallbackPremium ? Integer.MAX_VALUE : getRemainingAttempts());
@@ -168,19 +163,16 @@ public class HomeActivity extends AppCompatActivity {
         }).start();
     }
     private int getRemainingAttempts() {
-        // 1. Usar valor de caché si existe
         SharedPreferences prefs = getSharedPreferences("UrlPrefs", MODE_PRIVATE);
         int attempts = prefs.getInt("remaining_attempts", -1);
 
-        // 2. Si no hay caché o es premium, usar lógica existente
         if (attempts == -1 || isPremium) {
-            return isPremium ? Integer.MAX_VALUE : 5; // 5 es tu valor por defecto
+            return isPremium ? Integer.MAX_VALUE : 5;
         }
 
         return attempts;
     }
 
-    // Actualiza este método cuando recibas los intentos del servidor
     private void updateAttemptsCache(int attempts) {
         getSharedPreferences("UrlPrefs", MODE_PRIVATE)
                 .edit()
@@ -197,7 +189,6 @@ public class HomeActivity extends AppCompatActivity {
                     String countText = isPremium ? "Intentos: ∞ (Premium)" : "Intentos: " + remainingAttempts;
                     tvUrlCount.setText(countText);
 
-                    // Debug: Verificar valores
                     Log.d("PREMIUM_DEBUG", "Premium status: " + premiumStatus);
                     Log.d("PREMIUM_DEBUG", "Botón upgrade visible: " + !premiumStatus);
 
@@ -208,7 +199,6 @@ public class HomeActivity extends AppCompatActivity {
             @Override
             public void onError(String message) {
                 runOnUiThread(() -> {
-                    // Mostrar botón por si acaso (podría ser error temporal)
                     btnUpgrade.setVisibility(View.VISIBLE);
                     Log.e("PREMIUM_ERROR", message);
                 });
@@ -308,35 +298,29 @@ public class HomeActivity extends AppCompatActivity {
     private void updatePremiumUI(boolean isPremium, int remainingAttempts) {
         runOnUiThread(() -> {
             btnShorten.setEnabled(true);
-            // 1. Actualizar texto del contador
             String countText;
             if (isPremium) {
                 countText = "★ Cuenta Premium ★";
             } else {
                 FirebaseUser user = mAuth.getCurrentUser();
                 if (user != null && !user.isAnonymous()) {
-                    // Mostrar intentos para usuarios registrados no premium
                     countText = remainingAttempts == Integer.MAX_VALUE ?
                             "★ Cuenta Premium ★" : // Caso de seguridad
                             "Intentos: " + remainingAttempts;
                 } else {
-                    // Usuarios anónimos o no logueados
                     countText = "Inicia sesión para ver intentos";
                 }
             }
             tvUrlCount.setText(countText);
 
-            // 2. Actualizar visibilidad del botón de upgrade
             boolean shouldShowUpgradeButton = !isPremium &&
                     mAuth.getCurrentUser() != null &&
                     !mAuth.getCurrentUser().isAnonymous();
 
             btnUpgrade.setVisibility(shouldShowUpgradeButton ? View.VISIBLE : View.GONE);
 
-            // 3. Actualizar estado premium
             this.isPremium = isPremium;
 
-            // 4. Debug en logs
             Log.d("PremiumUI", "Estado actualizado - Premium: " + isPremium +
                     ", Intentos: " + remainingAttempts +
                     ", Botón visible: " + (btnUpgrade.getVisibility() == View.VISIBLE));
@@ -418,11 +402,10 @@ public class HomeActivity extends AppCompatActivity {
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         HistorialAdapter adapter = new HistorialAdapter(urls);
 
-        // Configurar el listener
         adapter.setOnItemDeletedListener(new HistorialAdapter.OnItemDeletedListener() {
             @Override
             public void onItemDeleted() {
-                loadUrlHistory(); // Recargar el historial cuando se elimina un item
+                loadUrlHistory();
             }
         });
 
@@ -462,20 +445,18 @@ public class HomeActivity extends AppCompatActivity {
                 OkHttpClient client = new OkHttpClient();
                 Request request = new Request.Builder()
                         .url("https://apiurl.up.railway.app/delete_user.php")
-                        .addHeader("Content-Type", "application/json") // Añade este header
+                        .addHeader("Content-Type", "application/json")
                         .delete(RequestBody.create(json.toString(), MediaType.parse("application/json")))
                         .build();
 
                 Response response = client.newCall(request).execute();
                 String responseData = response.body().string();
 
-                // Debug: Ver la respuesta cruda
                 Log.d("API_RESPONSE", "Respuesta: " + responseData);
 
                 runOnUiThread(() -> {
                     progressDialog.dismiss();
                     try {
-                        // Verifica si es una respuesta HTML no esperada
                         if (responseData.trim().startsWith("<!doctype")) {
                             throw new JSONException("El servidor devolvió una página HTML");
                         }

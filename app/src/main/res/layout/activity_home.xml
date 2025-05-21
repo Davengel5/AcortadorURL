@@ -10,7 +10,6 @@
         android:orientation="vertical"
         android:gravity="center">
 
-        <!-- Contador de URLs -->
         <TextView
             android:id="@+id/tvUrlCount"
             android:layout_width="match_parent"
@@ -19,7 +18,6 @@
             android:text="Intentos restantes: 5"
             android:textAlignment="center"/>
 
-        <!-- Input URL -->
         <EditText
             android:id="@+id/etUrl"
             android:layout_width="match_parent"
@@ -28,7 +26,6 @@
             android:inputType="textUri"
             android:imeOptions="actionDone"/>
 
-        <!-- Botón Acortar -->
         <Button
             android:id="@+id/btnShorten"
             android:layout_width="wrap_content"
@@ -36,7 +33,6 @@
             android:layout_marginTop="16dp"
             android:text="Acortar URL"/>
 
-        <!-- URL Acortada -->
         <TextView
             android:id="@+id/tvShortUrl"
             android:layout_width="match_parent"
@@ -45,7 +41,6 @@
             android:textAlignment="center"
             android:visibility="gone"/>
 
-        <!-- Botones de Acción -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -69,7 +64,6 @@
                 android:visibility="gone"/>
         </LinearLayout>
 
-        <!-- Añade esto antes del botón de cerrar sesión -->
         <Button
             android:id="@+id/btnUpgrade"
             android:layout_width="wrap_content"
@@ -84,7 +78,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:text="Ver Historial"/>
-        <!-- Botón Cerrar Sesión -->
+
         <Button
             android:id="@+id/btnLogout"
             android:layout_width="wrap_content"
