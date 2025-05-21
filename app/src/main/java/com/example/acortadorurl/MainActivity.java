@@ -1,11 +1,9 @@
 package com.example.acortadorurl;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
@@ -19,13 +17,8 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.GoogleAuthProvider;
 
-import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.IOException;
-
-import okhttp3.Call;
-import okhttp3.Callback;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -47,9 +40,8 @@ public class MainActivity extends AppCompatActivity {
         mAuth = FirebaseAuth.getInstance();
         btnGoogleLogin = findViewById(R.id.btnGoogleLogin);
 
-        // Configurar Google Sign-In
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                .requestIdToken(getString(R.string.default_web_client_id)) // Usa el ID de Firebase
+                .requestIdToken(getString(R.string.default_web_client_id))
                 .requestEmail()
                 .build();
         mGoogleSignInClient = GoogleSignIn.getClient(this, gso);
@@ -84,24 +76,137 @@ public class MainActivity extends AppCompatActivity {
                     if (task.isSuccessful()) {
                         FirebaseUser user = mAuth.getCurrentUser();
                         if (user != null) {
-                            insertUserInApi(user); // ¡Aquí llamamos al método!
+                            checkUserExistsAndRegister(user);
                         }
-
-                        Intent intent = new Intent(MainActivity.this, HomeActivity.class);
-                        startActivity(intent);
-                        finish();
                     } else {
                         Toast.makeText(this, "Error en autenticación", Toast.LENGTH_SHORT).show();
                     }
                 });
     }
-    // Añade este método a tu clase MainActivity
+
+    private void checkUserExistsAndRegister(FirebaseUser user) {
+        new Thread(() -> {
+            try {
+                JSONObject checkJson = new JSONObject();
+                checkJson.put("email", user.getEmail());
+
+                Request checkRequest = new Request.Builder()
+                        .url("https://apiurl.up.railway.app/check_user.php")
+                        .post(RequestBody.create(checkJson.toString(), MediaType.parse("application/json")))
+                        .build();
+
+                Response checkResponse = new OkHttpClient().newCall(checkRequest).execute();
+                String checkData = checkResponse.body().string();
+                JSONObject checkResult = new JSONObject(checkData);
+
+                if (!checkResult.getBoolean("exists")) {
+                    JSONObject registerJson = new JSONObject();
+                    registerJson.put("email", user.getEmail());
+                    registerJson.put("nombre", user.getDisplayName() != null ? user.getDisplayName() : "Usuario");
+                    registerJson.put("tipo", "Free");
+                    registerJson.put("intentos", 5);
+
+                    Request registerRequest = new Request.Builder()
+                            .url("https://apiurl.up.railway.app/insert_user.php")
+                            .post(RequestBody.create(registerJson.toString(), MediaType.parse("application/json")))
+                            .build();
+
+                    new OkHttpClient().newCall(registerRequest).execute();
+                }
+
+                checkPremiumStatus(user.getEmail());
+
+            } catch (Exception e) {
+                Log.e("Registration", "Error: ", e);
+                runOnUiThread(() -> {
+                    startActivity(new Intent(MainActivity.this, HomeActivity.class));
+                    finish();
+                });
+            }
+        }).start();
+    }
+
+    private void checkPremiumStatus(String email) {
+        new Thread(() -> {
+            try {
+                JSONObject json = new JSONObject();
+                json.put("email", email);
+
+                Request request = new Request.Builder()
+                        .url("https://apiurl.up.railway.app/get_premium_status.php")
+                        .post(RequestBody.create(json.toString(), MediaType.parse("application/json")))
+                        .build();
+
+                Response response = new OkHttpClient().newCall(request).execute();
+                String responseData = response.body().string();
+                JSONObject jsonResponse = new JSONObject(responseData);
+
+                boolean isPremium = jsonResponse.getBoolean("is_premium");
+
+                runOnUiThread(() -> {
+                    Intent intent = new Intent(MainActivity.this, HomeActivity.class);
+                    intent.putExtra("is_premium", isPremium);
+                    startActivity(intent);
+                    finish();
+                });
+
+            } catch (Exception e) {
+                Log.e("PremiumCheck", "Error: ", e);
+                runOnUiThread(() -> {
+                    startActivity(new Intent(MainActivity.this, HomeActivity.class));
+                    finish();
+                });
+            }
+        }).start();
+    }
+
+    private void registerUserInDatabase(FirebaseUser user) {
+        new Thread(() -> {
+            try {
+                JSONObject json = new JSONObject();
+                json.put("email", user.getEmail());
+                json.put("nombre", user.getDisplayName() != null ? user.getDisplayName() : "Usuario");
+                json.put("tipo", "Free"); // Por defecto Free
+                json.put("intentos", 5);  // Intentos iniciales
+
+                OkHttpClient client = new OkHttpClient();
+                Request request = new Request.Builder()
+                        .url("https://apiurl.up.railway.app/insert_user.php")
+                        .post(RequestBody.create(json.toString(), MediaType.parse("application/json")))
+                        .build();
+
+                client.newCall(request).execute();
+            } catch (Exception e) {
+                Log.e("REGISTER_ERROR", "Error registrando usuario", e);
+            }
+        }).start();
+    }
     private void insertUserInApi(FirebaseUser user) {
-        if (user == null) return;
+        if (user == null || user.getEmail() == null) return;
 
         new Thread(() -> {
             try {
                 OkHttpClient client = new OkHttpClient();
+
+                JSONObject checkUser = new JSONObject();
+                checkUser.put("email", user.getEmail());
+
+                Request checkRequest = new Request.Builder()
+                        .url("https://apiurl.up.railway.app/check_user.php")
+                        .post(RequestBody.create(
+                                checkUser.toString(),
+                                MediaType.parse("application/json")
+                        ))
+                        .build();
+
+                Response checkResponse = client.newCall(checkRequest).execute();
+                String checkData = checkResponse.body().string();
+                JSONObject checkJson = new JSONObject(checkData);
+
+                if (checkJson.getBoolean("exists")) {
+                    Log.d("API_RESPONSE", "Usuario ya registrado");
+                    return;
+                }
 
                 JSONObject json = new JSONObject();
                 json.put("nombre", user.getDisplayName() != null ? user.getDisplayName() : "Usuario");
@@ -109,14 +214,12 @@ public class MainActivity extends AppCompatActivity {
                 json.put("tipo", "Free");
                 json.put("intentos", 5);
 
-                RequestBody body = RequestBody.create(
-                        json.toString(),
-                        MediaType.parse("application/json")
-                );
-
                 Request request = new Request.Builder()
                         .url("https://apiurl.up.railway.app/insert_user.php")
-                        .post(body)
+                        .post(RequestBody.create(
+                                json.toString(),
+                                MediaType.parse("application/json")
+                        ))
                         .build();
 
                 Response response = client.newCall(request).execute();
@@ -124,14 +227,10 @@ public class MainActivity extends AppCompatActivity {
 
                 runOnUiThread(() -> {
                     Log.d("API_RESPONSE", "Usuario registrado: " + responseData);
-                    Toast.makeText(MainActivity.this, "Registro completado", Toast.LENGTH_SHORT).show();
                 });
 
             } catch (Exception e) {
-                runOnUiThread(() -> {
-                    Log.e("API_ERROR", "Error insertando usuario", e);
-                    Toast.makeText(MainActivity.this, "Error en registro", Toast.LENGTH_SHORT).show();
-                });
+                Log.e("API_ERROR", "Error insertando usuario", e);
             }
         }).start();
     }
